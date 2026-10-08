@@ -1,0 +1,75 @@
+/* ===== 全局样式 ===== */
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f5f7fa;
+  color: #303133;
+}
+
+/* ===== 预警状态颜色 (直接应用到 td, 防止 fixed 列透出非固定列文字) ===== */
+.el-table td.el-table__cell,
+.el-table th.el-table__cell {
+  background-color: #ffffff !important;
+}
+.el-table .el-table__row.warn-break-high td.el-table__cell {
+  background-color: #f0f9eb !important; color: #67c23a !important; font-weight: 600;
+}
+.el-table .el-table__row.warn-break-low td.el-table__cell {
+  background-color: #fef0f0 !important; color: #f56c6c !important; font-weight: 600;
+}
+.el-table .el-table__row.warn-near-high td.el-table__cell,
+.el-table .el-table__row.warn-near-low td.el-table__cell {
+  background-color: #fdf6ec !important; color: #e6a23c !important;
+}
+.el-table .el-table__row.warn-normal td.el-table__cell {
+  background-color: #ffffff !important;
+}
+
+/* 状态小圆点 */
+.status-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.dot-break-high { background: #67c23a; }
+.dot-break-low  { background: #f56c6c; }
+.dot-near-high  { background: #e6a23c; }
+.dot-near-low   { background: #e6a23c; }
+.dot-normal     { background: #c0c4cc; }
+
+/* ===== 响应式 ===== */
+@media (max-width: 768px) {
+  .pc-only { display: none !important; }
+  .mobile-wrap { padding: 8px; }
+}
+@media (min-width: 769px) {
+  .mobile-only { display: none !important; }
+}
+
+/* ===== 修复表格 fixed 列左右滚动时头尾文字重叠 ===== */
+/* 1. 强化固定列阴影, 使左右滚动时分隔更清晰 */
+.el-table {
+  --el-table-fixed-left-box-shadow: 8px 0 10px -4px rgba(0, 0, 0, 0.15);
+  --el-table-fixed-right-box-shadow: -8px 0 10px -4px rgba(0, 0, 0, 0.15);
+}
+/* 2. 单元格内容溢出时省略显示, 防止文字越过列边界与相邻列重叠 */
+.el-table .el-table__cell .cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 3. 固定列单元格层级高于普通列, 防止滚动时被遮挡 */
+.el-table .el-table__body td.el-table__cell.is-scrolling-left,
+.el-table .el-table__body td.el-table__cell.is-scrolling-right,
+.el-table .el-table__header th.el-table__cell.is-scrolling-left,
+.el-table .el-table__header th.el-table__cell.is-scrolling-right {
+  z-index: 3;
+}
+/* 4. 表头固定列 z-index 最高, 防止表头与表体错位 */
+.el-table .el-table__header th.el-table__cell.is-scrolling-left,
+.el-table .el-table__header th.el-table__cell.is-scrolling-right {
+  z-index: 4;
+}
