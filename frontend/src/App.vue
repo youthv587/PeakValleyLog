@@ -78,13 +78,22 @@ async function handleRefreshRecompute() {
   recomputing.value = true;
   try {
     const { data } = await api.refreshRecompute();
-    if (data.success === 0 && data.failed > 0) {
-      ElMessage.warning(`一键更新失败: 行情接口不可达, 失败 ${data.failed} 条。请稍后重试或检查网络`);
+    if (data.failed > 0 && data.failed_list?.length) {
+      const failedNames = data.failed_list.map((f) => `${f.name}(${f.code})`).join('、');
+      if (data.success > 0) {
+        ElMessage.success(`一键更新完成: 成功 ${data.success} 条, 失败 ${data.failed} 条`);
+      }
+      await ElMessageBox.alert(
+        `以下 ${data.failed} 条行情接口未覆盖, 已保留原值:\n\n${failedNames}`,
+        data.success > 0 ? '部分更新失败' : '一键更新失败',
+        { confirmButtonText: '知道了', type: data.success > 0 ? 'warning' : 'error' },
+      );
     } else {
-      ElMessage.success(`一键更新完成: 成功 ${data.success} 条, 失败 ${data.failed} 条。衍生指标已重算`);
+      ElMessage.success(`一键更新完成: 成功 ${data.success} 条, 衍生指标已重算`);
     }
     tableRef.value?.loadData();
   } catch (e) {
+    if (e === 'cancel' || e === 'close') return; // 取消确认弹框
     ElMessage.error('一键更新失败: ' + (e?.response?.data?.error || e.message));
   } finally {
     recomputing.value = false;

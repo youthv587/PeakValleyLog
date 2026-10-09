@@ -32,6 +32,7 @@ function validateSymbol(data) {
 
 /**
  * Excel 表头 -> 数据库字段映射
+ * 注意: base_return / base_risk 已改为自动计算(v1.0.10), 导入时忽略
  */
 const EXCEL_HEADER_MAP = {
   '名称': 'name',
@@ -40,8 +41,6 @@ const EXCEL_HEADER_MAP = {
   '近期均值': 'avg_price',
   '理论高点': 'high_theory',
   '理论低点': 'low_theory',
-  '基准收益': 'base_return',
-  '基准风险': 'base_risk',
   '预警高点': 'warn_high',
   '预警低点': 'warn_low',
   '备注': 'note',
@@ -81,14 +80,15 @@ function mapToExcelRow(row) {
     '近期均值': row.avg_price,
     '理论高点': row.high_theory,
     '理论低点': row.low_theory,
-    '基准收益': row.base_return,
-    '基准风险': row.base_risk,
+    '基准收益(自动)': row.base_return ?? '',
+    '基准风险(自动)': row.base_risk ?? '',
     '预警高点': row.warn_high,
     '预警低点': row.warn_low,
-    '实时点位': row.current_price ?? '',
-    '理论最大收益': row.max_return ?? '',
-    '理论最大回撤': row.max_drawdown ?? '',
+    '参考点位': row.reference_price ?? '',
+    '理论最大收益率': row.max_return ?? '',
+    '理论最大回撤率': row.max_drawdown ?? '',
     '差额收益率': row.spread_return ?? '',
+    '实时点位': row.current_price ?? '',
     '预警状态': { break_high: '突破高点', break_low: '突破低点', near_high: '临近高点', near_low: '临近低点', normal: '正常' }[row.warn_status] || '正常',
     '备注': row.note || '',
   };

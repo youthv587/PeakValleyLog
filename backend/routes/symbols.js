@@ -87,21 +87,45 @@ router.post('/', wrap(async (req, res) => {
 
 router.put('/:id', wrap(async (req, res) => {
   const { id } = req.params;
-  const err = validateSymbol(req.body);
-  if (err) return res.status(400).json({ error: err });
+  // 先查现有记录, 缺失字段用原值补齐 (支持部分字段更新, 供表格内联编辑)
+  const [[existing]] = await pool.query('SELECT * FROM symbols WHERE id = ?', [id]);
+  if (!existing) return res.status(404).json({ error: '标的不存在' });
 
-  const { name, code, category, avg_price, high_theory, low_theory,
-          base_return = 0, base_risk = 0, warn_high = null, warn_low = null, note = '' } = req.body;
+  // 合并: 前端传入字段优先, 缺失字段取 DB 原值
+  const body = req.body || {};
+  const merged = {
+    name: body.name ?? existing.name,
+    code: body.code ?? existing.code,
+    category: body.category ?? existing.category,
+    avg_price: Number(body.avg_price ?? existing.avg_price),
+    high_theory: Number(body.high_theory ?? existing.high_theory),
+    low_theory: Number(body.low_theory ?? existing.low_theory),
+    base_return: Number(body.base_return ?? existing.base_return ?? 0),
+    base_risk: Number(body.base_risk ?? existing.base_risk ?? 0),
+    warn_high: body.warn_high != null ? Number(body.warn_high) : existing.warn_high,
+    warn_low:  body.warn_low  != null ? Number(body.warn_low)  : existing.warn_low,
+    note: body.note ?? existing.note ?? '',
+  };
+
+  // 只有传入了完整必填字段时才做校验 (内联编辑可能只传一个数值字段)
+  if (body.name || body.code || body.category) {
+    const err = validateSymbol(merged);
+    if (err) return res.status(400).json({ error: err });
+  } else {
+    // 仅编辑数值字段: 校验三个数值是否合法
+    if (!(merged.avg_price > 0)) return res.status(400).json({ error: '近期均值必须为正数' });
+    if (!(merged.high_theory > 0)) return res.status(400).json({ error: '理论高点必须为正数' });
+    if (!(merged.low_theory > 0))  return res.status(400).json({ error: '理论低点必须为正数' });
+  }
 
   try {
     await pool.query(
       `UPDATE symbols SET name=?, code=?, category=?, avg_price=?, high_theory=?, low_theory=?,
          base_return=?, base_risk=?, warn_high=?, warn_low=?, note=?, updated_at=datetime('now','localtime') WHERE id=?`,
-      [name, code, category, avg_price, high_theory, low_theory,
-       base_return, base_risk, warn_high, warn_low, note, id],
+      [merged.name, merged.code, merged.category, merged.avg_price, merged.high_theory, merged.low_theory,
+       merged.base_return, merged.base_risk, merged.warn_high, merged.warn_low, merged.note, id],
     );
     const [[row]] = await pool.query('SELECT * FROM symbols WHERE id = ?', [id]);
-    if (!row) return res.status(404).json({ error: '标的不存在' });
     res.json(enrichSymbol(row));
   } catch (e) {
     if (String(e.message).includes('UNIQUE constraint')) return res.status(409).json({ error: '该分类下代码已存在' });
@@ -122,30 +146,31 @@ router.post('/refresh-recompute', wrap(async (req, res) => {
   const { id } = req.body || {};
   let rows;
   if (id) {
-    [rows] = await pool.query('SELECT id, category, code FROM symbols WHERE id = ?', [Number(id)]);
+    [rows] = await pool.query('SELECT id, name, category, code FROM symbols WHERE id = ?', [Number(id)]);
     if (!rows.length) return res.status(404).json({ error: '标的不存在' });
   } else {
-    [rows] = await pool.query('SELECT id, category, code FROM symbols');
+    [rows] = await pool.query('SELECT id, name, category, code FROM symbols');
   }
-  if (!rows.length) return res.json({ success: 0, failed: 0, skipped: 0 });
+  if (!rows.length) return res.json({ success: 0, failed: 0, failed_list: [] });
 
   const quotes = await batchFetchQuotes(rows);
-  let success = 0, failed = 0, skipped = 0;
+  let success = 0, failed = 0;
+  const failedList = [];
   for (const row of rows) {
     const price = quotes.get(row.code);
     if (!price || price <= 0) {
       failed++;
-      skipped++;
+      failedList.push({ name: row.name, code: row.code });
       continue;
     }
-    // 同时更新 current_price 和 avg_price(近期均值), 衍生指标(max_return/max_drawdown/spread_return) 自动重算
+    // 同时更新 current_price 和 avg_price(近期均值), 衍生指标自动重算
     await pool.query(
       `UPDATE symbols SET current_price=?, avg_price=?, updated_at=datetime('now','localtime') WHERE id=?`,
       [price, price, row.id],
     );
     success++;
   }
-  res.json({ success, failed, skipped, message: '已用最新行情覆盖近期均值, 衍生指标已重算' });
+  res.json({ success, failed, failed_list: failedList });
 }));
 
 // ===== Excel 导入导出 =====

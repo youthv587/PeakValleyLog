@@ -56,25 +56,88 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="avg" width="110" align="right" class-name="pc-only">
+      <el-table-column prop="avg" width="130" align="right" class-name="pc-only">
         <template #header>
           <el-tooltip :content="headerTips.avg" placement="top">
             <span class="th-with-tip">近期均值 ⓘ</span>
           </el-tooltip>
         </template>
+        <template #default="{ row }">
+          <div
+            v-if="editingCell.id === row.id && editingCell.field === 'avg_price'"
+            @click.stop
+          >
+            <el-input-number
+              v-model="editingCell.value"
+              :precision="2"
+              :min="0.01"
+              size="small"
+              controls-position="right"
+              style="width:110px"
+              @keyup.enter="saveInlineEdit(row, 'avg_price')"
+              @keyup.esc="cancelInlineEdit"
+              @blur="saveInlineEdit(row, 'avg_price')"
+            />
+          </div>
+          <div v-else class="editable-cell" @click="startInlineEdit(row, 'avg_price')">
+            {{ fmt2(row.avg) }}
+          </div>
+        </template>
       </el-table-column>
-      <el-table-column prop="high" width="110" align="right" class-name="pc-only">
+      <el-table-column prop="high" width="130" align="right" class-name="pc-only">
         <template #header>
           <el-tooltip :content="headerTips.high" placement="top">
             <span class="th-with-tip">理论高点 ⓘ</span>
           </el-tooltip>
         </template>
+        <template #default="{ row }">
+          <div
+            v-if="editingCell.id === row.id && editingCell.field === 'high_theory'"
+            @click.stop
+          >
+            <el-input-number
+              v-model="editingCell.value"
+              :precision="2"
+              :min="0.01"
+              size="small"
+              controls-position="right"
+              style="width:110px"
+              @keyup.enter="saveInlineEdit(row, 'high_theory')"
+              @keyup.esc="cancelInlineEdit"
+              @blur="saveInlineEdit(row, 'high_theory')"
+            />
+          </div>
+          <div v-else class="editable-cell" @click="startInlineEdit(row, 'high_theory')">
+            {{ fmt2(row.high) }}
+          </div>
+        </template>
       </el-table-column>
-      <el-table-column prop="low" width="110" align="right" class-name="pc-only">
+      <el-table-column prop="low" width="130" align="right" class-name="pc-only">
         <template #header>
           <el-tooltip :content="headerTips.low" placement="top">
             <span class="th-with-tip">理论低点 ⓘ</span>
           </el-tooltip>
+        </template>
+        <template #default="{ row }">
+          <div
+            v-if="editingCell.id === row.id && editingCell.field === 'low_theory'"
+            @click.stop
+          >
+            <el-input-number
+              v-model="editingCell.value"
+              :precision="2"
+              :min="0.01"
+              size="small"
+              controls-position="right"
+              style="width:110px"
+              @keyup.enter="saveInlineEdit(row, 'low_theory')"
+              @keyup.esc="cancelInlineEdit"
+              @blur="saveInlineEdit(row, 'low_theory')"
+            />
+          </div>
+          <div v-else class="editable-cell" @click="startInlineEdit(row, 'low_theory')">
+            {{ fmt2(row.low) }}
+          </div>
         </template>
       </el-table-column>
       <el-table-column prop="reference_price" width="110" align="right">
@@ -85,7 +148,7 @@
         </template>
         <template #default="{ row }">
           <span class="text-bold text-blue">
-            {{ row.reference_price ?? '-' }}
+            {{ row.reference_price != null ? fmt2(row.reference_price) : '-' }}
           </span>
         </template>
       </el-table-column>
@@ -138,13 +201,13 @@
         <div class="mc-header">
           <div class="mc-name">{{ row.name }} <span class="mc-code">{{ row.code }}</span></div>
           <div class="mc-current text-blue">
-            {{ row.reference_price ?? '-' }}
+            {{ row.reference_price != null ? fmt2(row.reference_price) : '-' }}
           </div>
         </div>
         <div class="mc-body">
-          <div>均值: {{ row.avg }}</div>
-          <div>高: {{ row.high }}</div>
-          <div>低: {{ row.low }}</div>
+          <div>均值: {{ fmt2(row.avg) }}</div>
+          <div>高: {{ fmt2(row.high) }}</div>
+          <div>低: {{ fmt2(row.low) }}</div>
           <div class="mc-spread">差额: {{ pct(row.spread_return) }}</div>
         </div>
         <div class="mc-actions">
@@ -183,6 +246,9 @@ const loading = ref(false);
 const updatingId = ref(null);
 const rows = ref([]);
 const total = ref(0);
+
+// 内联编辑状态
+const editingCell = reactive({ id: null, field: null, value: null });
 const query = reactive({
   keyword: '',
   category: '',
@@ -194,13 +260,13 @@ const query = reactive({
 // 各指标列悬停描述 (计算规则 / 含义)
 const headerTips = {
   warn_status: '预警状态：根据实时点位与预警线比较生成。突破高点=深绿，突破低点=深红，临近预警线=黄，正常=透明。',
-  avg: '近期均值：用户录入的近期价格均值，作为理论最大收益/回撤/差额收益率的计算基准。',
-  high: '理论高点：用户预期的理论最高点位，用于计算理论最大收益和参考点位的上限依据。',
-  low: '理论低点：用户预期的理论最低点位，用于计算理论最大回撤的下限依据。',
-  reference_price: '参考点位 = 差额收益率为20%时的指数点位。公式：理论高点 / (1.2 + 基准收益)。即在该点位下，理论最大收益 - 基准收益 = 20%。',
-  max_return: '理论最大收益 = (理论高点 - 近期均值) / 近期均值。从近期均值到理论高点的预期涨幅。',
-  max_drawdown: '理论最大回撤 = (理论低点 - 近期均值) / 近期均值。从近期均值到理论低点的预期跌幅（负数）。',
-  spread_return: '差额收益率 = 理论最大收益 - 基准收益。衡量相对基准的超额收益，可正可负。点击表头可排序。',
+  avg: '近期均值：用户录入的近期价格均值，作为基准收益/基准风险的计算基准。',
+  high: '理论高点：用户预期的理论最高点位。',
+  low: '理论低点：用户预期的理论最低点位。',
+  reference_price: '参考点位 = (理论高点 + 理论低点) / 2.2，即差额收益率=20%时的指数点位。',
+  max_return: '理论最大收益率 = (理论高点 - 理论低点) / 理论低点。从低点到高点的预期最大涨幅。',
+  max_drawdown: '理论最大回撤率 = (理论低点 - 理论高点) / 理论高点。从高点到低点的预期最大跌幅（负数）。',
+  spread_return: '差额收益率 = 基准收益 + 基准风险 = (高点-均值)/均值 + (低点-均值)/均值。点击表头可排序。',
 };
 
 // 列头排序映射 (prop -> 后端 sort 参数)
@@ -249,7 +315,7 @@ async function handleUpdateRow(row) {
     if (data.success > 0) {
       ElMessage.success(`${row.name} 已用最新净值更新, 衍生指标已重算`);
     } else {
-      ElMessage.warning(`${row.name} 更新失败: 该代码行情未覆盖, 已保留原值`);
+      ElMessage.warning(`${row.name}(${row.code}) 行情接口未覆盖, 已保留原值`);
     }
     await loadData();
   } catch (e) {
@@ -272,6 +338,40 @@ function pct(v) {
   if (v === null || v === undefined || Number.isNaN(v)) return '-';
   return (Number(v) * 100).toFixed(2) + '%';
 }
+// 数值保留2位小数显示
+function fmt2(v) {
+  if (v === null || v === undefined || Number.isNaN(v)) return '-';
+  return Number(v).toFixed(2);
+}
+
+// ===== 内联编辑 (点击单元格 → el-input-number → 失焦/Enter 保存) =====
+function startInlineEdit(row, field) {
+  // 映射字段: DB 字段名 → 前端别名
+  const aliasMap = { avg_price: 'avg', high_theory: 'high', low_theory: 'low' };
+  editingCell.id = row.id;
+  editingCell.field = field;
+  editingCell.value = Number(row[aliasMap[field] || row[field]]);
+}
+function cancelInlineEdit() {
+  editingCell.id = null;
+  editingCell.field = null;
+  editingCell.value = null;
+}
+async function saveInlineEdit(row, field) {
+  const val = editingCell.value;
+  cancelInlineEdit();
+  if (val === null || val === undefined) return;
+  try {
+    const { data } = await api.update(row.id, { [field]: val });
+    // 后端 enrichSymbol 已重算所有衍生指标, 本地直接更新该行
+    const idx = rows.value.findIndex((r) => r.id === row.id);
+    if (idx >= 0) rows.value.splice(idx, 1, data);
+    ElMessage.success(`${row.name} 已更新, 衍生指标已重算`);
+  } catch (e) {
+    ElMessage.error('保存失败: ' + (e?.response?.data?.error || e.message));
+    await loadData();
+  }
+}
 
 defineExpose({ loadData });
 onMounted(loadData);
@@ -291,6 +391,19 @@ onMounted(loadData);
 .text-red { color: #f56c6c; }
 .text-blue { color: #409eff; }
 .th-with-tip { cursor: help; border-bottom: 1px dashed #909399; }
+
+/* 内联编辑单元格 */
+.editable-cell {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.editable-cell:hover {
+  background: #ecf5ff;
+  color: #409eff;
+  font-weight: 600;
+}
 
 /* 移动端卡片 */
 .mobile-card-list { display: flex; flex-direction: column; gap: 10px; }

@@ -48,13 +48,13 @@
       </el-row>
       <el-row :gutter="16">
         <el-col :span="8">
-          <el-form-item label="基准收益" prop="base_return">
-            <el-input-number v-model="form.base_return" :precision="4" :step="0.01" controls-position="right" style="width:100%" />
+          <el-form-item label="基准收益">
+            <div class="auto-calc-val" :class="preview.base_return >= 0 ? 'text-green' : 'text-red'">{{ pct(preview.base_return) }}</div>
           </el-form-item>
         </el-col>
         <el-col :span="8">
           <el-form-item label="基准风险">
-            <el-input-number v-model="form.base_risk" :precision="4" :step="0.01" controls-position="right" style="width:100%" />
+            <div class="auto-calc-val text-red">{{ pct(preview.base_risk) }}</div>
           </el-form-item>
         </el-col>
         <el-col :span="8">
@@ -78,6 +78,8 @@
         <el-col :span="6"><div class="cp-item">理论最大回撤<span class="cp-val text-red">{{ pct(preview.max_drawdown) }}</span></div></el-col>
         <el-col :span="6"><div class="cp-item">差额收益率<span class="cp-val" :class="preview.spread_return >= 0 ? 'text-green' : 'text-red'">{{ pct(preview.spread_return) }}</span></div></el-col>
         <el-col :span="6"><div class="cp-item">参考点位<span class="cp-val text-blue">{{ preview.reference_price || '-' }}</span></div></el-col>
+        <el-col :span="6"><div class="cp-item">基准收益<span class="cp-val" :class="preview.base_return >= 0 ? 'text-green' : 'text-red'">{{ pct(preview.base_return) }}</span></div></el-col>
+        <el-col :span="6"><div class="cp-item">基准风险<span class="cp-val text-red">{{ pct(preview.base_risk) }}</span></div></el-col>
       </el-row>
 
       <el-form-item label="备注">
@@ -124,19 +126,22 @@ const rules = {
   low_theory:   [{ required: true, message: '请输入理论低点', trigger: 'blur' }],
 };
 
-// 实时计算预览
+// 实时计算预览 (新公式: v1.0.10)
 const preview = computed(() => {
   const avg = Number(form.avg_price);
   const high = Number(form.high_theory);
   const low = Number(form.low_theory);
-  const base = Number(form.base_return || 0);
-  const mr = CALC.calcMaxReturn(high, avg);
-  const md = CALC.calcMaxDrawdown(low, avg);
+  const mr = CALC.calcMaxReturn(high, low);
+  const md = CALC.calcMaxDrawdown(low, high);
+  const br = CALC.calcBaseReturn(high, avg);
+  const bk = CALC.calcBaseRisk(low, avg);
   return {
     max_return: mr,
     max_drawdown: md,
-    spread_return: CALC.calcSpreadReturn(mr, base),
-    reference_price: CALC.calcReferencePrice(high, base),
+    base_return: br,
+    base_risk: bk,
+    spread_return: CALC.calcSpreadReturn(br, bk),
+    reference_price: CALC.calcReferencePrice(high, low),
   };
 });
 
@@ -184,4 +189,17 @@ defineExpose({ open });
 .text-green { color: #67c23a; }
 .text-red { color: #f56c6c; }
 .text-blue { color: #409eff; }
+
+/* 自动计算只读值 */
+.auto-calc-val {
+  padding: 6px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
 </style>
