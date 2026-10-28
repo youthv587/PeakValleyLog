@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS symbols (
   warn_high       REAL    DEFAULT NULL,
   warn_low        REAL    DEFAULT NULL,
   current_price   REAL    DEFAULT NULL,
+  quote_status    TEXT    DEFAULT NULL,
   note            TEXT    DEFAULT NULL,
   created_at      TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
   updated_at      TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
@@ -43,6 +44,17 @@ CREATE TABLE IF NOT EXISTS symbols (
 `);
 
 console.log(`[DB] SQLite ready: ${DB_PATH}`);
+
+// 轻量迁移: 旧库缺少 quote_status 列时自动补齐
+try {
+  const cols = db.pragma('table_info(symbols)');
+  if (!cols.some((c) => c.name === 'quote_status')) {
+    db.exec(`ALTER TABLE symbols ADD COLUMN quote_status TEXT DEFAULT NULL`);
+    console.log('[DB] Migrated: added column quote_status');
+  }
+} catch (e) {
+  console.error('[DB] Migration failed:', e.message);
+}
 
 // 便利方法: 统一参数绑定 (better-sqlite3 用 ? 占位符, 与 mysql2 一致)
 function query(sql, params = []) {

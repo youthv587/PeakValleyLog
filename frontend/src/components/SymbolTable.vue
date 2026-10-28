@@ -43,8 +43,15 @@
           </el-tooltip>
         </template>
         <template #default="{ row }">
-          <span class="status-dot" :class="`dot-${row.warn_status}`"></span>
-          {{ statusText(row.warn_status) }}
+          <template v-if="row.quote_status === 'failed'">
+            <el-tooltip content="该代码行情接口未覆盖，一键更新未成功，点位数据非最新" placement="top">
+              <span class="quote-failed"><span class="status-dot dot-failed"></span>未更新</span>
+            </el-tooltip>
+          </template>
+          <template v-else>
+            <span class="status-dot" :class="`dot-${row.warn_status}`"></span>
+            {{ statusText(row.warn_status) }}
+          </template>
         </template>
       </el-table-column>
       <el-table-column prop="name" label="名称" width="140" fixed />
@@ -196,10 +203,13 @@
         v-for="row in rows"
         :key="row.id"
         class="mobile-card"
-        :class="`card-${row.warn_status}`"
+        :class="row.quote_status === 'failed' ? 'card-failed' : `card-${row.warn_status}`"
       >
         <div class="mc-header">
-          <div class="mc-name">{{ row.name }} <span class="mc-code">{{ row.code }}</span></div>
+          <div class="mc-name">
+            {{ row.name }} <span class="mc-code">{{ row.code }}</span>
+            <el-tag v-if="row.quote_status === 'failed'" size="small" type="info" class="mc-failed-tag">未更新</el-tag>
+          </div>
           <div class="mc-current text-blue">
             {{ row.reference_price != null ? fmt2(row.reference_price) : '-' }}
           </div>
@@ -391,6 +401,15 @@ onMounted(loadData);
 .text-red { color: #f56c6c; }
 .text-blue { color: #409eff; }
 .th-with-tip { cursor: help; border-bottom: 1px dashed #909399; }
+
+/* 行情未更新标记 */
+.quote-failed {
+  color: #e6a23c;
+  font-weight: 600;
+}
+.status-dot.dot-failed { background: #e6a23c; }
+.card-failed { border-left-color: #e6a23c; background: #fdf6ec; }
+.mc-failed-tag { margin-left: 6px; }
 
 /* 内联编辑单元格 */
 .editable-cell {

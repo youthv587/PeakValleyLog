@@ -161,11 +161,13 @@ router.post('/refresh-recompute', wrap(async (req, res) => {
     if (!price || price <= 0) {
       failed++;
       failedList.push({ name: row.name, code: row.code });
+      // 标记行情未更新, 状态列据此显示"未更新"
+      await pool.query(`UPDATE symbols SET quote_status='failed' WHERE id=?`, [row.id]);
       continue;
     }
     // 同时更新 current_price 和 avg_price(近期均值), 衍生指标自动重算
     await pool.query(
-      `UPDATE symbols SET current_price=?, avg_price=?, updated_at=datetime('now','localtime') WHERE id=?`,
+      `UPDATE symbols SET current_price=?, avg_price=?, quote_status='updated', updated_at=datetime('now','localtime') WHERE id=?`,
       [price, price, row.id],
     );
     success++;
